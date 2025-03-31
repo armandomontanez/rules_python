@@ -36,6 +36,8 @@ else:
 def IsWindows():
   return os.name == 'nt'
 
+raise ValueError(sys.version)
+
 def GetWindowsPathWithUNCPrefix(path):
   """Adds UNC prefix after getting a normalized absolute Windows path.
 
@@ -93,7 +95,6 @@ def print_verbose(*args, mapping=None, values=None):
     if os.environ.get("RULES_PYTHON_BOOTSTRAP_VERBOSE"):
         if mapping is not None:
             for key, value in sorted((mapping or {}).items()):
-                raise ValueError(sys.version)
                 print(
                     "bootstrap:",
                     *args,
