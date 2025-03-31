@@ -36,8 +36,6 @@ else:
 def IsWindows():
   return os.name == 'nt'
 
-raise ValueError(sys.version)
-
 def GetWindowsPathWithUNCPrefix(path):
   """Adds UNC prefix after getting a normalized absolute Windows path.
 
