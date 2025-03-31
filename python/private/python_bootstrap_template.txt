@@ -99,7 +99,7 @@ def print_verbose(*args, mapping=None, values=None):
                 print(
                     "bootstrap:",
                     *args,
-                    f"{key}={value!r}",
+                    "{}={}".format(key, repr(value)),
                     file=sys.stderr,
                     flush=True,
                 )
@@ -108,7 +108,7 @@ def print_verbose(*args, mapping=None, values=None):
                 print(
                     "bootstrap:",
                     *args,
-                    f"[{i}] {v!r}",
+                    "[{}] {}".format(i, repr(v)),
                     file=sys.stderr,
                     flush=True,
                 )
