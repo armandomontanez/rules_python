@@ -100,7 +100,7 @@ def print_verbose(*args, mapping=None, values=None):
                     *args,
                     "{}={}".format(key, repr(value)),
                     file=sys.stderr,
-                    flush=True,
+                    flush=True
                 )
         elif values is not None:
             for i, v in enumerate(values):
@@ -109,7 +109,7 @@ def print_verbose(*args, mapping=None, values=None):
                     *args,
                     "[{}] {}".format(i, repr(v)),
                     file=sys.stderr,
-                    flush=True,
+                    flush=True
                 )
         else:
             print("bootstrap:", *args, file=sys.stderr, flush=True)
