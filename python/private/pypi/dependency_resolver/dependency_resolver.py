@@ -41,6 +41,15 @@ original_annotation_style_split = piptools_writer.annotation_style_split
 original_annotation_style_line = piptools_writer.annotation_style_line
 
 
+# Runfiles that start with this prefix are treated as in-repo and passed
+# as relative files.
+_MAIN_REPO_PREFIX = '_main/'
+
+# External sources are mapped like:
+#   <_EXTERNAL_REPO_PREFIX_REPLACEMENT>/<repo name>/<path to file>
+_EXTERNAL_REPO_PREFIX_REPLACEMENT = 'external/'
+
+
 def annotation_style_split(required_by) -> str:
     required_by = set([v.replace("\\", "/") for v in required_by])
     return original_annotation_style_split(required_by)
@@ -81,6 +90,20 @@ def _locate(bazel_runfiles, file):
 
     return bazel_runfiles.Rlocation(file)
 
+def _replace_with_dict(text, replacements):
+    """Searches `text` for keys in `replacements` and subs in the matching value.
+
+    Args:
+        text: String containing text to substitute values into.
+        replacements: A string->string dict with strings to search for and
+            the values that should replace the strings.
+
+    Returns:
+        Text with the substitutions.
+    """
+    for before, after in replacements.items():
+        text = text.replace(before, after)
+    return text
 
 @click.command(context_settings={"ignore_unknown_options": True})
 @click.option("--src", "srcs", multiple=True, required=True)
@@ -111,22 +134,43 @@ def main(
     resolved_srcs = [_locate(bazel_runfiles, src) for src in srcs]
     resolved_requirements_file = _locate(bazel_runfiles, requirements_file)
 
-    # Files in the runfiles directory has the following naming schema:
-    # Main repo: __main__/<path_to_file>
-    # External repo: <workspace name>/<path_to_file>
-    # We want to strip both __main__ and <workspace name> from the absolute prefix
-    # to keep the requirements lock file agnostic.
-    repository_prefix = requirements_file[: requirements_file.index("/") + 1]
-    absolute_path_prefix = resolved_requirements_file[
-        : -(len(requirements_file) - len(repository_prefix))
-    ]
+    # Runfiles paths can take the following forms:
+    #
+    #   Main repo: _main/<path to file>
+    #   External repo: <repository name>/<path to file>
+    #
+    # Once fetched with Rlocation(), these become absolute paths to one of
+    # the following:
+    #
+    #   <execroot>/_main/<path to file>
+    #   <execroot>/<repository name>/<path to file>
+    #   /absolute/path/to/workspace/root/<path to file>
+    #
+    # We want to do two things here:
+    #   1. Prefer relative paths to files in the main repo.
+    #   2. Replace ALL absolute path prefixes in the generated requirements files.
 
-    # As srcs might contain references to generated files we want to
-    # use the runfiles file first. Thus, we need to compute the relative path
-    # from the execution root.
+    # Prefer relative paths to files in the main repo.
     # Note: Windows cannot reference generated files without runfiles support enabled.
-    srcs_relative = [src[len(repository_prefix) :] for src in srcs]
-    requirements_file_relative = requirements_file[len(repository_prefix) :]
+    srcs_relative = [
+        src.removeprefix(_MAIN_REPO_PREFIX)
+        if src.startswith(_MAIN_REPO_PREFIX) else resolved_src
+        for src, resolved_src in zip(srcs, resolved_srcs)
+    ]
+    requirements_file_relative = requirements_file[len(_MAIN_REPO_PREFIX) :]
+
+    # Build up the set of absolute path replacements.
+    abs_path_replacements = {}
+    for file, resolved_file in zip(srcs, resolved_srcs):
+        repo_prefix = file[: file.index("/") + 1]
+        absolute_path_prefix = resolved_file[: -(len(file))]
+        abs_path_replacements[absolute_path_prefix] = (
+            '' if repo_prefix == _MAIN_REPO_PREFIX else _EXTERNAL_REPO_PREFIX_REPLACEMENT
+        )
+        # Minor optimization: this should only ever find at most three absolute
+        # path prefixes (see above).
+        if len(abs_path_replacements.keys()) >= 3:
+            break
 
     # Before loading click, set the locale for its parser.
     # If it leaks through to the system setting, it may fail:
@@ -173,10 +217,7 @@ def main(
     argv.append(
         f"--output-file={requirements_file_relative if UPDATE else requirements_out}"
     )
-    argv.extend(
-        (src_relative if Path(src_relative).exists() else resolved_src)
-        for src_relative, resolved_src in zip(srcs_relative, resolved_srcs)
-    )
+    argv.extend(srcs_relative)
     argv.extend(extra_args)
 
     _run_pip_compile = functools.partial(
@@ -207,15 +248,15 @@ def main(
         _run_pip_compile(verbose_command=f"{update_command} -- --verbose")
         requirements_file_relative_path = Path(requirements_file_relative)
         content = requirements_file_relative_path.read_text()
-        content = content.replace(absolute_path_prefix, "")
+        content = _replace_with_dict(content, abs_path_replacements)
         requirements_file_relative_path.write_text(content)
     else:
         print("Checking " + requirements_file)
         sys.stdout.flush()
         _run_pip_compile(verbose_command=f"{test_command} --test_arg=--verbose")
         golden = open(_locate(bazel_runfiles, requirements_file)).readlines()
-        out = open(requirements_out).readlines()
-        out = [line.replace(absolute_path_prefix, "") for line in out]
+        out = open(requirements_out).read_text()
+        out = _replace_with_dict(content, abs_path_replacements).splitlines()
         if golden != out:
             import difflib
 

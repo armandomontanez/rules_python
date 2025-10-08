@@ -19,6 +19,18 @@ use_repo(
     python_3_9 = "python_3_9_13",
 )
 
+externalized_file = use_repo_rule("//:externalized_file.bzl", "externalized_file")
+
+externalized_file(
+    name = "external_requirements",
+    src = "//:external_requirements.in",
+)
+
+externalized_file(
+    name = "external_constraints",
+    src = "//:constraints_external.txt",
+)
+
 pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
 pip.parse(
     download_only = True,

@@ -84,6 +84,8 @@ END_UNRELEASED_TEMPLATE
   when the APIs get removed. If you need to customize the way the dependencies get
   evaluated, see [our docs](/pypi/download.html#customizing-requires-dist-resolution) on customizing `Requires-Dist` resolution.
 * (toolchains) Added Python version 3.14.0.
+* (pypi) compile_pip_requirements now normalizes external inputs to have an
+  `external/` prefix rather than absolute paths.
 
 {#v0-0-0-fixed}
 ### Fixed

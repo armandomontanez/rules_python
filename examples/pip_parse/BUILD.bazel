@@ -56,10 +56,14 @@ py_console_script_binary(
 # This rule adds a convenient way to update the requirements file.
 compile_pip_requirements(
     name = "requirements",
-    src = "requirements.in",
+    srcs = [
+        "requirements.in",
+        "@external_requirements//:external_requirements.in",
+    ],
     constraints = [
         "constraints_certifi.txt",
         "constraints_urllib3.txt",
+        "@external_constraints//:constraints_external.txt",
     ],
     requirements_txt = "requirements_lock.txt",
     requirements_windows = "requirements_windows.txt",
